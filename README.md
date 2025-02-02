@@ -1,10 +1,17 @@
 # YTM API TS
 
-> This package is a fork of [zS1L3NT/ts-npm-ytmusic-api](https://github.com/zS1L3NT/ts-npm-ytmusic-api) adapted for my specific needs. The original project is maintained by [zS1L3NT](https://github.com/zS1L3NT).
+> This package is a fork of [zS1L3NT/ts-npm-ytmusic-api](https://github.com/zS1L3NT/ts-npm-ytmusic-api) adapted for my specific needs. The original project was itself inspired by [youtube-music-api](https://npmjs.com/package/youtube-music-api) and rewritten with TypeScript support by [zS1L3NT](https://github.com/zS1L3NT).
 
 ![License](https://img.shields.io/github/license/zokiasu/ts-npm-ytmusic-api?style=for-the-badge) ![Languages](https://img.shields.io/github/languages/count/zokiasu/ts-npm-ytmusic-api?style=for-the-badge) ![Top Language](https://img.shields.io/github/languages/top/zokiasu/ts-npm-ytmusic-api?style=for-the-badge) ![Commit Activity](https://img.shields.io/github/commit-activity/y/zokiasu/ts-npm-ytmusic-api?style=for-the-badge) ![Last commit](https://img.shields.io/github/last-commit/zokiasu/ts-npm-ytmusic-api?style=for-the-badge)
 
-YouTube Music API (Unofficial) is a YouTube Music data scraper. It comes with TypeScript support API for return types. The NPM package can be found [here](https://npmjs.com/package/ytm-api-ts)
+YouTube Music API (Unofficial) is a YouTube Music data scraper with TypeScript support. The NPM package can be found [here](https://npmjs.com/package/ytm-api-ts)
+
+## Credits
+
+This project follows this evolution:
+1. Original [youtube-music-api](https://npmjs.com/package/youtube-music-api) package
+2. Rewritten with TypeScript by [zS1L3NT](https://github.com/zS1L3NT) as [ts-npm-ytmusic-api](https://github.com/zS1L3NT/ts-npm-ytmusic-api)
+3. Current fork maintained by [zokiasu](https://github.com/zokiasu)
 
 ## Features
 
@@ -31,10 +38,6 @@ ytmusic.search("Never gonna give you up").then(songs => {
 	console.log(songs)
 })
 ```
-
-## Credits
-
-A lot of the credit should go to [youtube-music-api](https://npmjs.com/package/youtube-music-api). I build this package as a refactored and tested version of youtube-music-api with TypeScript annotations
 
 ## Testing
 
