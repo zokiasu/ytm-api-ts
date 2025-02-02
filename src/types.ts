@@ -13,7 +13,7 @@ export type ArtistBasic = z.infer<typeof ArtistBasic>
 export const ArtistBasic = z
 	.object({
 		artistId: z.nullable(z.string()),
-		name: z.string(),
+		name: z.nullable(z.string()),
 	})
 	.strict()
 
