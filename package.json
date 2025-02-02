@@ -1,11 +1,11 @@
 {
-	"name": "ytmusic-api",
-	"version": "5.3.0",
-	"description": "YouTube Music API",
+	"name": "ytm-api-ts",
+	"version": "1.0.0",
+	"description": "YouTube Music API with TypeScript support",
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
 	"types": "./dist/index.d.ts",
-	"author": "zS1L3NT <dev@zectan.com> (http://www.zectan.com)",
+	"author": "zokiasu",
 	"license": "GPL-3.0",
 	"repository": {
 		"type": "git",
