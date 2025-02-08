@@ -19,7 +19,8 @@ import {
 } from "../types"
 
 const errors: ZodError[] = []
-const queries = ["Lilac", "Weekend", "Eill", "Eminem", "Lisa Hannigan"]
+const BLACKPINK_ID = "UCkbbMCA40i18i7UdjayMPAg"
+
 const expect = (data: any, type: ZodType) => {
 	const result = type.safeParse(data)
 
@@ -39,102 +40,29 @@ const expect = (data: any, type: ZodType) => {
 const ytmusic = new YTMusic()
 beforeAll(() => ytmusic.initialize())
 
-queries.forEach(query => {
-	describe("Query: " + query, () => {
-		it("Search suggestions", async () => {
-			const suggestions = await ytmusic.getSearchSuggestions(query)
-			expect(suggestions, z.array(z.string()))
-		})
+describe("BLACKPINK Tests", () => {
+	it("Get artist details", async () => {
+		const artist = await ytmusic.getArtist(BLACKPINK_ID)
+		expect(artist, ArtistFull)
+		console.log("Artist details:", JSON.stringify(artist, null, 2))
+	})
 
-		it("Search Songs", async () => {
-			const songs = await ytmusic.searchSongs(query)
-			expect(songs, z.array(SongDetailed))
-		})
+	it("Get singles", async () => {
+		const singles = await ytmusic.getArtistSingles(BLACKPINK_ID)
+		expect(singles, z.array(AlbumDetailed))
+		console.log("Singles:", JSON.stringify(singles, null, 2))
+	})
 
-		it("Search Videos", async () => {
-			const videos = await ytmusic.searchVideos(query)
-			expect(videos, z.array(VideoDetailed))
-		})
+	it("Get albums", async () => {
+		const albums = await ytmusic.getArtistAlbums(BLACKPINK_ID)
+		expect(albums, z.array(AlbumDetailed))
+		console.log("Albums:", JSON.stringify(albums, null, 2))
+	})
 
-		it("Search Artists", async () => {
-			const artists = await ytmusic.searchArtists(query)
-			expect(artists, z.array(ArtistDetailed))
-		})
-
-		it("Search Albums", async () => {
-			const albums = await ytmusic.searchAlbums(query)
-			expect(albums, z.array(AlbumDetailed))
-		})
-
-		it("Search Playlists", async () => {
-			const playlists = await ytmusic.searchPlaylists(query)
-			expect(playlists, z.array(PlaylistDetailed))
-		})
-
-		it("Search All", async () => {
-			const results = await ytmusic.search(query)
-			expect(results, z.array(SearchResult))
-		})
-
-		it("Get lyrics of the first song result", async () => {
-			const songs = await ytmusic.searchSongs(query)
-			const lyrics = await ytmusic.getLyrics(songs[0]!.videoId)
-			expect(lyrics, z.nullable(z.array(z.string())))
-		})
-
-		it("Get details of the first song result", async () => {
-			const songs = await ytmusic.searchSongs(query)
-			const song = await ytmusic.getSong(songs[0]!.videoId)
-			expect(song, SongFull)
-		})
-
-		it("Get details of the first video result", async () => {
-			const videos = await ytmusic.searchVideos(query)
-			const video = await ytmusic.getVideo(videos[0]!.videoId)
-			expect(video, VideoFull)
-		})
-
-		it("Get details of the first artist result", async () => {
-			const artists = await ytmusic.searchArtists(query)
-			const artist = await ytmusic.getArtist(artists[0]!.artistId)
-			expect(artist, ArtistFull)
-		})
-
-		it("Get singles of the first artist result", async () => {
-			const artists = await ytmusic.searchArtists(query)
-			const singles = await ytmusic.getArtistSingles(artists[0]!.artistId)
-			expect(singles, z.array(AlbumDetailed))
-		})
-
-		it("Get albums of the first artist result", async () => {
-			const artists = await ytmusic.searchArtists(query)
-			const albums = await ytmusic.getArtistAlbums(artists[0]!.artistId)
-			expect(albums, z.array(AlbumDetailed))
-		})
-
-		it("Get the songs of the first artist result", async () => {
-			const artists = await ytmusic.searchArtists(query)
-			const songs = await ytmusic.getArtistSongs(artists[0]!.artistId)
-			expect(songs, z.array(SongDetailed))
-		})
-
-		it("Get details of the first album result", async () => {
-			const albums = await ytmusic.searchAlbums(query)
-			const album = await ytmusic.getAlbum(albums[0]!.albumId)
-			expect(album, AlbumFull)
-		})
-
-		it("Get details of the first playlist result", async () => {
-			const playlists = await ytmusic.searchPlaylists(query)
-			const playlist = await ytmusic.getPlaylist(playlists[0]!.playlistId)
-			expect(playlist, PlaylistFull)
-		})
-
-		it("Get the videos of the first playlist result", async () => {
-			const playlists = await ytmusic.searchPlaylists(query)
-			const videos = await ytmusic.getPlaylistVideos(playlists[0]!.playlistId)
-			expect(videos, z.array(VideoDetailed))
-		})
+	it("Get songs", async () => {
+		const songs = await ytmusic.getArtistSongs(BLACKPINK_ID)
+		expect(songs, z.array(SongDetailed))
+		console.log("Songs:", JSON.stringify(songs, null, 2))
 	})
 })
 

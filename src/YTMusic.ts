@@ -472,18 +472,61 @@ export default class YTMusic {
 	public async getArtistAlbums(artistId: string): Promise<AlbumDetailed[]> {
 		const artistData = await this.constructRequest("browse", {
 			browseId: artistId,
-		})
-		const artistAlbumsData = traverseList(artistData, "musicCarouselShelfRenderer")[0]
-		const browseBody = traverse(artistAlbumsData, "moreContentButton", "browseEndpoint")
+		});
+		
+		// Afficher tous les carousels pour voir leurs titres
+		const carousels = traverseList(artistData, "musicCarouselShelfRenderer");
+		// console.log("\nTous les carousels disponibles:");
+		carousels.forEach(carousel => {
+			const title = traverseString(carousel, "header", "musicCarouselShelfBasicHeaderRenderer", "title", "text");
+			// console.log("Titre du carousel:", title);
+		});
 
-		const albumsData = await this.constructRequest("browse", browseBody)
+		// Trouver le carousel des albums
+		const albumsCarousel = carousels.find(carousel => {
+			const title = traverseString(carousel, "header", "musicCarouselShelfBasicHeaderRenderer", "title", "text");
+			// console.log("Vérification du titre pour albums:", title);
+			return title && title.toLowerCase() === "albums";
+		});
 
-		return traverseList(albumsData, "musicTwoRowItemRenderer").map(item =>
-			AlbumParser.parseArtistAlbum(item, {
+		if (!albumsCarousel) {
+			// console.log("Aucun carousel d'albums trouvé");
+			return [];
+		}
+
+		// Récupérer les albums du carousel et les filtrer
+		const albums = traverseList(albumsCarousel, "musicTwoRowItemRenderer")
+			.map(item => AlbumParser.parseArtistAlbum(item, {
+				artistId,
+				name: traverseString(artistData, "header", "title", "text"),
+			}))
+			.filter(album => 
+				album.artist.artistId === artistId && // Même artiste
+				album.year && // L'année existe
+				!album.albumId.startsWith("VL") // Pas une playlist
+			);
+
+		// Vérifier s'il y a un bouton "more"
+		const browseBody = traverse(albumsCarousel, "moreContentButton", "browseEndpoint");
+		
+		if (!browseBody) {
+			return albums;
+		}
+
+		// Si on a un bouton "more", récupérer tous les albums
+		const albumsData = await this.constructRequest("browse", browseBody);
+		const moreAlbums = traverseList(albumsData, "musicTwoRowItemRenderer")
+			.map(item => AlbumParser.parseArtistAlbum(item, {
 				artistId,
 				name: traverseString(albumsData, "header", "runs", "text"),
-			}),
-		)
+			}))
+			.filter(album => 
+				album.artist.artistId === artistId && // Même artiste
+				album.year && // L'année existe
+				!album.albumId.startsWith("VL") // Pas une playlist
+			);
+
+		return [...albums, ...moreAlbums];
 	}
 
 	/**
@@ -497,18 +540,43 @@ export default class YTMusic {
 			browseId: artistId,
 		});
 		
-		// Le carousel des singles est le deuxième (index 1)
-		const artistSinglesData = traverseList(artistData, "musicCarouselShelfRenderer")[1];
-		const browseBody = traverse(artistSinglesData, "moreContentButton", "browseEndpoint");
+		// Trouver le carousel des singles
+		const carousels = traverseList(artistData, "musicCarouselShelfRenderer");
+		const singlesCarousel = carousels.find(carousel => {
+			const title = traverseString(carousel, "header", "musicCarouselShelfBasicHeaderRenderer", "title", "text");
+			return title && title.toLowerCase() === "singles";
+		});
 
+		if (!singlesCarousel) {
+			// console.log("Aucun carousel de singles trouvé");
+			return [];
+		}
+
+		// Récupérer les singles du carousel
+		const singles = traverseList(singlesCarousel, "musicTwoRowItemRenderer").map(item =>
+			AlbumParser.parseArtistAlbum(item, {
+				artistId,
+				name: traverseString(artistData, "header", "title", "text"),
+			}),
+		);
+
+		// Vérifier s'il y a un bouton "more"
+		const browseBody = traverse(singlesCarousel, "moreContentButton", "browseEndpoint");
+		
+		if (!browseBody) {
+			return singles;
+		}
+
+		// Si on a un bouton "more", récupérer tous les singles
 		const singlesData = await this.constructRequest("browse", browseBody);
-
-		return traverseList(singlesData, "musicTwoRowItemRenderer").map(item =>
+		const moreSingles = traverseList(singlesData, "musicTwoRowItemRenderer").map(item =>
 			AlbumParser.parseArtistAlbum(item, {
 				artistId,
 				name: traverseString(singlesData, "header", "runs", "text"),
 			}),
 		);
+
+		return [...singles, ...moreSingles];
 	}
 
 	/**
