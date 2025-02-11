@@ -29,7 +29,7 @@ This project follows this evolution:
 ## Usage
 
 ```js
-import YTMusic from "ytmusic-api"
+import YTMusic from "ytm-api-ts"
 
 const ytmusic = new YTMusic()
 await ytmusic.initialize(/* Optional: Custom cookies */)
