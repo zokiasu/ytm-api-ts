@@ -329,6 +329,30 @@ export default class YTMusic {
 		)
 	}
 
+	private async withRetry<T>(fn: () => Promise<T>, attempts: number = 3): Promise<T> {
+		let lastError: Error | null = null;
+		
+		for (let i = 0; i < attempts; i++) {
+			try {
+				const result = await fn();
+				// Vérifier si le résultat est valide avant de le retourner
+				if (result === null || result === undefined) {
+					throw new Error("Null or undefined result received");
+				}
+				return result;
+			} catch (error) {
+				lastError = error as Error;
+				console.warn(`Attempt ${i + 1}/${attempts} failed: ${lastError.message}`);
+				if (i < attempts - 1) {
+					const delay = Math.min(Math.pow(2, i) * 1000, 10000); // Max 10 secondes de délai
+					await new Promise(resolve => setTimeout(resolve, delay));
+				}
+			}
+		}
+		
+		throw lastError;
+	}
+
 	/**
 	 * Get all possible information of a Song
 	 *
@@ -337,11 +361,64 @@ export default class YTMusic {
 	 */
 	public async getSong(videoId: string): Promise<SongFull> {
 		if (!videoId.match(/^[a-zA-Z0-9-_]{11}$/)) throw new Error("Invalid videoId")
-		const data = await this.constructRequest("player", { videoId })
+		
+		return this.withRetry(async () => {
+			try {
+				// Première tentative avec l'endpoint "player"
+				const data = await this.constructRequest("player", { videoId })
+				
+				if (!data || typeof data !== 'object') {
+					throw new Error("Invalid response from YouTube Music API")
+				}
 
-		const song = SongParser.parse(data)
-		if (song.videoId !== videoId) throw new Error("Invalid videoId")
-		return song
+				if ('error' in data) {
+					// Si l'erreur indique que la vidéo n'est pas disponible, essayons une autre approche
+					if ((data as any).error?.message?.includes('Video unavailable')) {
+						// Essayer d'obtenir les informations via l'endpoint "next"
+						const nextData = await this.constructRequest("next", { 
+							videoId,
+							playlistId: `RDAMVM${videoId}`,
+							isAudioOnly: true
+						});
+
+						if (!nextData || typeof nextData !== 'object') {
+							throw new Error("Invalid response from next endpoint")
+						}
+
+						// Extraire les informations de base de la chanson depuis nextData
+						const songInfo = nextData?.contents?.singleColumnMusicWatchNextResultsRenderer
+							?.tabbedRenderer?.watchNextTabbedResultsRenderer?.tabs[0]
+							?.tabRenderer?.content?.musicQueueRenderer?.content
+							?.playlistPanelRenderer?.contents[0]?.playlistPanelVideoRenderer;
+
+						if (!songInfo) {
+							throw new Error("Could not find song information in next endpoint response")
+						}
+
+						// Construire un objet song minimal
+						return SongParser.parse({
+							videoDetails: {
+								videoId: songInfo.videoId,
+								title: songInfo.title?.runs[0]?.text || "",
+								author: songInfo.shortBylineText?.runs[0]?.text || "",
+								lengthSeconds: songInfo.lengthText?.runs[0]?.text || "",
+								thumbnail: songInfo.thumbnail?.thumbnails || []
+							}
+						});
+					}
+					throw new Error(`YouTube Music API error: ${(data as any).error?.message || 'Unknown error'}`)
+				}
+
+				const song = SongParser.parse(data)
+				if (!song || song.videoId !== videoId) {
+					throw new Error("Invalid song data returned from API")
+				}
+
+				return song
+			} catch (error) {
+				throw new Error(`Failed to get song with videoId ${videoId}: ${(error as Error).message}`)
+			}
+		}, 5);
 	}
 	
   /**
