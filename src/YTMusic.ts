@@ -157,10 +157,13 @@ export default class YTMusic {
 			"X-YouTube-Time-Zone": new Intl.DateTimeFormat().resolvedOptions().timeZone,
 		}
 
-		const searchParams = new URLSearchParams({
+		const searchParams = new URLSearchParams()
+		Object.entries({
 			...query,
 			alt: "json",
 			key: this.config.INNERTUBE_API_KEY!,
+		}).forEach(([key, value]) => {
+			searchParams.append(key, value)
 		})
 
 		const res = await this.client.post(
