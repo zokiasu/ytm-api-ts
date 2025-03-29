@@ -329,6 +329,30 @@ export default class YTMusic {
 		)
 	}
 
+	private async withRetry<T>(fn: () => Promise<T>, attempts: number = 3): Promise<T> {
+		let lastError: Error | null = null;
+		
+		for (let i = 0; i < attempts; i++) {
+			try {
+				const result = await fn();
+				// Vérifier si le résultat est valide avant de le retourner
+				if (result === null || result === undefined) {
+					throw new Error("Null or undefined result received");
+				}
+				return result;
+			} catch (error) {
+				lastError = error as Error;
+				console.warn(`Attempt ${i + 1}/${attempts} failed: ${lastError.message}`);
+				if (i < attempts - 1) {
+					const delay = Math.min(Math.pow(2, i) * 1000, 10000); // Max 10 secondes de délai
+					await new Promise(resolve => setTimeout(resolve, delay));
+				}
+			}
+		}
+		
+		throw lastError;
+	}
+
 	/**
 	 * Get all possible information of a Song
 	 *
@@ -337,11 +361,64 @@ export default class YTMusic {
 	 */
 	public async getSong(videoId: string): Promise<SongFull> {
 		if (!videoId.match(/^[a-zA-Z0-9-_]{11}$/)) throw new Error("Invalid videoId")
-		const data = await this.constructRequest("player", { videoId })
+		
+		return this.withRetry(async () => {
+			try {
+				// Première tentative avec l'endpoint "player"
+				const data = await this.constructRequest("player", { videoId })
+				
+				if (!data || typeof data !== 'object') {
+					throw new Error("Invalid response from YouTube Music API")
+				}
 
-		const song = SongParser.parse(data)
-		if (song.videoId !== videoId) throw new Error("Invalid videoId")
-		return song
+				if ('error' in data) {
+					// Si l'erreur indique que la vidéo n'est pas disponible, essayons une autre approche
+					if ((data as any).error?.message?.includes('Video unavailable')) {
+						// Essayer d'obtenir les informations via l'endpoint "next"
+						const nextData = await this.constructRequest("next", { 
+							videoId,
+							playlistId: `RDAMVM${videoId}`,
+							isAudioOnly: true
+						});
+
+						if (!nextData || typeof nextData !== 'object') {
+							throw new Error("Invalid response from next endpoint")
+						}
+
+						// Extraire les informations de base de la chanson depuis nextData
+						const songInfo = nextData?.contents?.singleColumnMusicWatchNextResultsRenderer
+							?.tabbedRenderer?.watchNextTabbedResultsRenderer?.tabs[0]
+							?.tabRenderer?.content?.musicQueueRenderer?.content
+							?.playlistPanelRenderer?.contents[0]?.playlistPanelVideoRenderer;
+
+						if (!songInfo) {
+							throw new Error("Could not find song information in next endpoint response")
+						}
+
+						// Construire un objet song minimal
+						return SongParser.parse({
+							videoDetails: {
+								videoId: songInfo.videoId,
+								title: songInfo.title?.runs[0]?.text || "",
+								author: songInfo.shortBylineText?.runs[0]?.text || "",
+								lengthSeconds: songInfo.lengthText?.runs[0]?.text || "",
+								thumbnail: songInfo.thumbnail?.thumbnails || []
+							}
+						});
+					}
+					throw new Error(`YouTube Music API error: ${(data as any).error?.message || 'Unknown error'}`)
+				}
+
+				const song = SongParser.parse(data)
+				if (!song || song.videoId !== videoId) {
+					throw new Error("Invalid song data returned from API")
+				}
+
+				return song
+			} catch (error) {
+				throw new Error(`Failed to get song with videoId ${videoId}: ${(error as Error).message}`)
+			}
+		}, 5);
 	}
 	
   /**
@@ -472,18 +549,61 @@ export default class YTMusic {
 	public async getArtistAlbums(artistId: string): Promise<AlbumDetailed[]> {
 		const artistData = await this.constructRequest("browse", {
 			browseId: artistId,
-		})
-		const artistAlbumsData = traverseList(artistData, "musicCarouselShelfRenderer")[0]
-		const browseBody = traverse(artistAlbumsData, "moreContentButton", "browseEndpoint")
+		});
+		
+		// Afficher tous les carousels pour voir leurs titres
+		const carousels = traverseList(artistData, "musicCarouselShelfRenderer");
+		// console.log("\nTous les carousels disponibles:");
+		carousels.forEach(carousel => {
+			const title = traverseString(carousel, "header", "musicCarouselShelfBasicHeaderRenderer", "title", "text");
+			// console.log("Titre du carousel:", title);
+		});
 
-		const albumsData = await this.constructRequest("browse", browseBody)
+		// Trouver le carousel des albums
+		const albumsCarousel = carousels.find(carousel => {
+			const title = traverseString(carousel, "header", "musicCarouselShelfBasicHeaderRenderer", "title", "text");
+			// console.log("Vérification du titre pour albums:", title);
+			return title && title.toLowerCase() === "albums";
+		});
 
-		return traverseList(albumsData, "musicTwoRowItemRenderer").map(item =>
-			AlbumParser.parseArtistAlbum(item, {
+		if (!albumsCarousel) {
+			// console.log("Aucun carousel d'albums trouvé");
+			return [];
+		}
+
+		// Récupérer les albums du carousel et les filtrer
+		const albums = traverseList(albumsCarousel, "musicTwoRowItemRenderer")
+			.map(item => AlbumParser.parseArtistAlbum(item, {
+				artistId,
+				name: traverseString(artistData, "header", "title", "text"),
+			}))
+			.filter(album => 
+				album.artist.artistId === artistId && // Même artiste
+				album.year && // L'année existe
+				!album.albumId.startsWith("VL") // Pas une playlist
+			);
+
+		// Vérifier s'il y a un bouton "more"
+		const browseBody = traverse(albumsCarousel, "moreContentButton", "browseEndpoint");
+		
+		if (!browseBody) {
+			return albums;
+		}
+
+		// Si on a un bouton "more", récupérer tous les albums
+		const albumsData = await this.constructRequest("browse", browseBody);
+		const moreAlbums = traverseList(albumsData, "musicTwoRowItemRenderer")
+			.map(item => AlbumParser.parseArtistAlbum(item, {
 				artistId,
 				name: traverseString(albumsData, "header", "runs", "text"),
-			}),
-		)
+			}))
+			.filter(album => 
+				album.artist.artistId === artistId && // Même artiste
+				album.year && // L'année existe
+				!album.albumId.startsWith("VL") // Pas une playlist
+			);
+
+		return [...albums, ...moreAlbums];
 	}
 
 	/**
@@ -497,18 +617,51 @@ export default class YTMusic {
 			browseId: artistId,
 		});
 		
-		// Le carousel des singles est le deuxième (index 1)
-		const artistSinglesData = traverseList(artistData, "musicCarouselShelfRenderer")[1];
-		const browseBody = traverse(artistSinglesData, "moreContentButton", "browseEndpoint");
+		// Trouver le carousel des singles
+		const carousels = traverseList(artistData, "musicCarouselShelfRenderer");
+		const singlesCarousel = carousels.find(carousel => {
+			const title = traverseString(carousel, "header", "musicCarouselShelfBasicHeaderRenderer", "title", "text");
+			return title && title.toLowerCase() === "singles";
+		});
 
+		if (!singlesCarousel) {
+			// console.log("Aucun carousel de singles trouvé");
+			return [];
+		}
+
+		// Récupérer les singles du carousel
+		const singles = traverseList(singlesCarousel, "musicTwoRowItemRenderer")
+			.map(item => AlbumParser.parseArtistAlbum(item, {
+				artistId,
+				name: traverseString(artistData, "header", "title", "text"),
+			}))
+			.filter(single => 
+				single.artist.artistId === artistId && // Même artiste
+				single.year && // L'année existe
+				!single.albumId.startsWith("VL") // Pas une playlist
+			);
+
+		// Vérifier s'il y a un bouton "more"
+		const browseBody = traverse(singlesCarousel, "moreContentButton", "browseEndpoint");
+		
+		if (!browseBody) {
+			return singles;
+		}
+
+		// Si on a un bouton "more", récupérer tous les singles
 		const singlesData = await this.constructRequest("browse", browseBody);
-
-		return traverseList(singlesData, "musicTwoRowItemRenderer").map(item =>
-			AlbumParser.parseArtistAlbum(item, {
+		const moreSingles = traverseList(singlesData, "musicTwoRowItemRenderer")
+			.map(item => AlbumParser.parseArtistAlbum(item, {
 				artistId,
 				name: traverseString(singlesData, "header", "runs", "text"),
-			}),
-		);
+			}))
+			.filter(single => 
+				single.artist.artistId === artistId && // Même artiste
+				single.year && // L'année existe
+				!single.albumId.startsWith("VL") // Pas une playlist
+			);
+
+		return [...singles, ...moreSingles];
 	}
 
 	/**

@@ -13,7 +13,7 @@ export default class PlaylistParser {
 				playlistId,
 				name: traverseString(data, "tabs", "title", "text"),
 				artist: {
-					name: traverseString(artist, "text"),
+					name: traverseString(artist, "text") || null,
 					artistId: traverseString(artist, "browseId") || null,
 				},
 				videoCount:
@@ -41,7 +41,7 @@ export default class PlaylistParser {
 				playlistId: traverseString(item, "overlay", "playlistId"),
 				name: traverseString(title, "text"),
 				artist: {
-					name: traverseString(artist, "text"),
+					name: traverseString(artist, "text") || null,
 					artistId: traverseString(artist, "browseId") || null,
 				},
 				thumbnails: traverseList(item, "thumbnails"),
@@ -56,7 +56,10 @@ export default class PlaylistParser {
 				type: "PLAYLIST",
 				playlistId: traverseString(item, "navigationEndpoint", "browseId"),
 				name: traverseString(item, "runs", "text"),
-				artist: artistBasic,
+				artist: {
+					name: artistBasic.name || null,
+					artistId: artistBasic.artistId || null,
+				},
 				thumbnails: traverseList(item, "thumbnails"),
 			},
 			PlaylistDetailed,
@@ -72,7 +75,7 @@ export default class PlaylistParser {
 				playlistId: traverseString(item, "navigationEndpoint", "playlistId"),
 				name: traverseString(item, "runs", "text"),
 				artist: {
-					name: traverseString(artist, "text"),
+					name: traverseString(artist, "text") || null,
 					artistId: traverseString(artist, "browseId") || null,
 				},
 				thumbnails: traverseList(item, "thumbnails"),

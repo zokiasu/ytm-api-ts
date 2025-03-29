@@ -1,13 +1,17 @@
-# YTMusic API
+# YTM API TS
 
-![License](https://img.shields.io/github/license/zS1L3NT/ts-npm-ytmusic-api?style=for-the-badge) ![Languages](https://img.shields.io/github/languages/count/zS1L3NT/ts-npm-ytmusic-api?style=for-the-badge) ![Top Language](https://img.shields.io/github/languages/top/zS1L3NT/ts-npm-ytmusic-api?style=for-the-badge) ![Commit Activity](https://img.shields.io/github/commit-activity/y/zS1L3NT/ts-npm-ytmusic-api?style=for-the-badge) ![Last commit](https://img.shields.io/github/last-commit/zS1L3NT/ts-npm-ytmusic-api?style=for-the-badge)
+> This package is a fork of [zS1L3NT/ts-npm-ytmusic-api](https://github.com/zS1L3NT/ts-npm-ytmusic-api) adapted for my specific needs. The original project was itself inspired by [youtube-music-api](https://npmjs.com/package/youtube-music-api) and rewritten with TypeScript support by [zS1L3NT](https://github.com/zS1L3NT).
 
-YouTube Music API (Unofficial) is a YouTube Music data scraper. It comes with TypeScript support API for return types. The NPM package can be found [here](https://npmjs.com/package/ytmusic-api)
+![License](https://img.shields.io/github/license/zokiasu/ts-npm-ytmusic-api?style=for-the-badge) ![Languages](https://img.shields.io/github/languages/count/zokiasu/ts-npm-ytmusic-api?style=for-the-badge) ![Top Language](https://img.shields.io/github/languages/top/zokiasu/ts-npm-ytmusic-api?style=for-the-badge) ![Commit Activity](https://img.shields.io/github/commit-activity/y/zokiasu/ts-npm-ytmusic-api?style=for-the-badge) ![Last commit](https://img.shields.io/github/last-commit/zokiasu/ts-npm-ytmusic-api?style=for-the-badge)
 
-## Motivation
+YouTube Music API (Unofficial) is a YouTube Music data scraper with TypeScript support. The NPM package can be found [here](https://npmjs.com/package/ytm-api-ts)
 
-I used to use [youtube-music-api](https://npmjs.com/package/youtube-music-api) as my youtube music api data scraper. I liked looking into the source code of how it works but it never made sense to me. I also didn't like that there were no TypeScript annotations for the return types of methods.
-Because of this, I decided to build my own version of a youtube music api with TypeScript annotations, testing and written in a way I can understand.
+## Credits
+
+This project follows this evolution:
+1. Original [youtube-music-api](https://npmjs.com/package/youtube-music-api) package
+2. Rewritten with TypeScript by [zS1L3NT](https://github.com/zS1L3NT) as [ts-npm-ytmusic-api](https://github.com/zS1L3NT/ts-npm-ytmusic-api)
+3. Current fork maintained by [zokiasu](https://github.com/zokiasu)
 
 ## Features
 
@@ -25,7 +29,7 @@ Because of this, I decided to build my own version of a youtube music api with T
 ## Usage
 
 ```js
-import YTMusic from "ytmusic-api"
+import YTMusic from "ytm-api-ts"
 
 const ytmusic = new YTMusic()
 await ytmusic.initialize(/* Optional: Custom cookies */)
@@ -34,10 +38,6 @@ ytmusic.search("Never gonna give you up").then(songs => {
 	console.log(songs)
 })
 ```
-
-## Credits
-
-A lot of the credit should go to [youtube-music-api](https://npmjs.com/package/youtube-music-api). I build this package as a refactored and tested version of youtube-music-api with TypeScript annotations
 
 ## Testing
 
