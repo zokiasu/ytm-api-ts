@@ -607,61 +607,67 @@ export default class YTMusic {
 	}
 
 	/**
-	 * Get all of Artist's Singles
+	 * Get all of Artist's Singles and EPs
 	 *
 	 * @param artistId Artist ID
-	 * @returns Artist's Singles
+	 * @returns Artist's Singles and EPs
 	 */
 	public async getArtistSingles(artistId: string): Promise<AlbumDetailed[]> {
 		const artistData = await this.constructRequest("browse", {
 			browseId: artistId,
 		});
 		
-		// Trouver le carousel des singles
+		// Trouver les carousels des singles et EPs
 		const carousels = traverseList(artistData, "musicCarouselShelfRenderer");
-		const singlesCarousel = carousels.find(carousel => {
+		const relevantCarousels = carousels.filter(carousel => {
 			const title = traverseString(carousel, "header", "musicCarouselShelfBasicHeaderRenderer", "title", "text");
-			return title && title.toLowerCase() === "singles";
+			return title && title.toLowerCase().includes("singles")
 		});
 
-		if (!singlesCarousel) {
-			// console.log("Aucun carousel de singles trouvé");
+		if (relevantCarousels.length === 0) {
 			return [];
 		}
 
-		// Récupérer les singles du carousel
-		const singles = traverseList(singlesCarousel, "musicTwoRowItemRenderer")
-			.map(item => AlbumParser.parseArtistAlbum(item, {
-				artistId,
-				name: traverseString(artistData, "header", "title", "text"),
-			}))
-			.filter(single => 
-				single.artist.artistId === artistId && // Même artiste
-				single.year && // L'année existe
-				!single.albumId.startsWith("VL") // Pas une playlist
-			);
+		let allItems: AlbumDetailed[] = [];
 
-		// Vérifier s'il y a un bouton "more"
-		const browseBody = traverse(singlesCarousel, "moreContentButton", "browseEndpoint");
-		
-		if (!browseBody) {
-			return singles;
+		// Traiter chaque carousel pertinent
+		for (const carousel of relevantCarousels) {
+			// Récupérer les singles/EPs du carousel
+			const items = traverseList(carousel, "musicTwoRowItemRenderer")
+				.map(item => AlbumParser.parseArtistAlbum(item, {
+					artistId,
+					name: traverseString(artistData, "header", "title", "text"),
+				}))
+				.filter(item => 
+					item.artist.artistId === artistId && // Même artiste
+					item.year && // L'année existe
+					!item.albumId.startsWith("VL") // Pas une playlist
+				);
+
+			allItems = [...allItems, ...items];
+
+			// Vérifier s'il y a un bouton "more"
+			const browseBody = traverse(carousel, "moreContentButton", "browseEndpoint");
+			
+			if (browseBody) {
+				// Si on a un bouton "more", récupérer tous les items
+				const moreData = await this.constructRequest("browse", browseBody);
+				const moreItems = traverseList(moreData, "musicTwoRowItemRenderer")
+					.map(item => AlbumParser.parseArtistAlbum(item, {
+						artistId,
+						name: traverseString(moreData, "header", "runs", "text"),
+					}))
+					.filter(item => 
+						item.artist.artistId === artistId && // Même artiste
+						item.year && // L'année existe
+						!item.albumId.startsWith("VL") // Pas une playlist
+					);
+
+				allItems = [...allItems, ...moreItems];
+			}
 		}
 
-		// Si on a un bouton "more", récupérer tous les singles
-		const singlesData = await this.constructRequest("browse", browseBody);
-		const moreSingles = traverseList(singlesData, "musicTwoRowItemRenderer")
-			.map(item => AlbumParser.parseArtistAlbum(item, {
-				artistId,
-				name: traverseString(singlesData, "header", "runs", "text"),
-			}))
-			.filter(single => 
-				single.artist.artistId === artistId && // Même artiste
-				single.year && // L'année existe
-				!single.albumId.startsWith("VL") // Pas une playlist
-			);
-
-		return [...singles, ...moreSingles];
+		return allItems;
 	}
 
 	/**
