@@ -6,6 +6,6 @@ export default defineConfig({
 	splitting: true,
 	sourcemap: true,
 	clean: true,
-	dts: true,
+	dts: false,
 	cjsInterop: true,
 })
