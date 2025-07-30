@@ -14,9 +14,11 @@ import {
 	AlbumFull,
 	ArtistDetailed,
 	ArtistFull,
+	ArtistReleases,
 	HomeSection,
 	PlaylistDetailed,
 	PlaylistFull,
+	ReleaseType,
 	SearchResult,
 	SongDetailed,
 	SongFull,
@@ -24,6 +26,7 @@ import {
 	VideoDetailed,
 	VideoFull,
 } from "./types"
+import { checkTypeStrict } from "./utils/checkType"
 import { traverse, traverseList, traverseString } from "./utils/traverse"
 
 axios.defaults.headers.common["Accept-Encoding"] = "gzip"
@@ -333,27 +336,27 @@ export default class YTMusic {
 	}
 
 	private async withRetry<T>(fn: () => Promise<T>, attempts: number = 3): Promise<T> {
-		let lastError: Error | null = null;
-		
+		let lastError: Error | null = null
+
 		for (let i = 0; i < attempts; i++) {
 			try {
-				const result = await fn();
+				const result = await fn()
 				// Vérifier si le résultat est valide avant de le retourner
 				if (result === null || result === undefined) {
-					throw new Error("Null or undefined result received");
+					throw new Error("Null or undefined result received")
 				}
-				return result;
+				return result
 			} catch (error) {
-				lastError = error as Error;
-				console.warn(`Attempt ${i + 1}/${attempts} failed: ${lastError.message}`);
+				lastError = error as Error
+				console.warn(`Attempt ${i + 1}/${attempts} failed: ${lastError.message}`)
 				if (i < attempts - 1) {
-					const delay = Math.min(Math.pow(2, i) * 1000, 10000); // Max 10 secondes de délai
-					await new Promise(resolve => setTimeout(resolve, delay));
+					const delay = Math.min(Math.pow(2, i) * 1000, 10000) // Max 10 secondes de délai
+					await new Promise(resolve => setTimeout(resolve, delay))
 				}
 			}
 		}
-		
-		throw lastError;
+
+		throw lastError
 	}
 
 	/**
@@ -364,38 +367,41 @@ export default class YTMusic {
 	 */
 	public async getSong(videoId: string): Promise<SongFull> {
 		if (!videoId.match(/^[a-zA-Z0-9-_]{11}$/)) throw new Error("Invalid videoId")
-		
+
 		return this.withRetry(async () => {
 			try {
 				// Première tentative avec l'endpoint "player"
 				const data = await this.constructRequest("player", { videoId })
-				
-				if (!data || typeof data !== 'object') {
+
+				if (!data || typeof data !== "object") {
 					throw new Error("Invalid response from YouTube Music API")
 				}
 
-				if ('error' in data) {
+				if ("error" in data) {
 					// Si l'erreur indique que la vidéo n'est pas disponible, essayons une autre approche
-					if ((data as any).error?.message?.includes('Video unavailable')) {
+					if ((data as any).error?.message?.includes("Video unavailable")) {
 						// Essayer d'obtenir les informations via l'endpoint "next"
-						const nextData = await this.constructRequest("next", { 
+						const nextData = await this.constructRequest("next", {
 							videoId,
 							playlistId: `RDAMVM${videoId}`,
-							isAudioOnly: true
-						});
+							isAudioOnly: true,
+						})
 
-						if (!nextData || typeof nextData !== 'object') {
+						if (!nextData || typeof nextData !== "object") {
 							throw new Error("Invalid response from next endpoint")
 						}
 
 						// Extraire les informations de base de la chanson depuis nextData
-						const songInfo = nextData?.contents?.singleColumnMusicWatchNextResultsRenderer
-							?.tabbedRenderer?.watchNextTabbedResultsRenderer?.tabs[0]
-							?.tabRenderer?.content?.musicQueueRenderer?.content
-							?.playlistPanelRenderer?.contents[0]?.playlistPanelVideoRenderer;
+						const songInfo =
+							nextData?.contents?.singleColumnMusicWatchNextResultsRenderer
+								?.tabbedRenderer?.watchNextTabbedResultsRenderer?.tabs[0]
+								?.tabRenderer?.content?.musicQueueRenderer?.content
+								?.playlistPanelRenderer?.contents[0]?.playlistPanelVideoRenderer
 
 						if (!songInfo) {
-							throw new Error("Could not find song information in next endpoint response")
+							throw new Error(
+								"Could not find song information in next endpoint response",
+							)
 						}
 
 						// Construire un objet song minimal
@@ -405,11 +411,13 @@ export default class YTMusic {
 								title: songInfo.title?.runs[0]?.text || "",
 								author: songInfo.shortBylineText?.runs[0]?.text || "",
 								lengthSeconds: songInfo.lengthText?.runs[0]?.text || "",
-								thumbnail: songInfo.thumbnail?.thumbnails || []
-							}
-						});
+								thumbnail: songInfo.thumbnail?.thumbnails || [],
+							},
+						})
 					}
-					throw new Error(`YouTube Music API error: ${(data as any).error?.message || 'Unknown error'}`)
+					throw new Error(
+						`YouTube Music API error: ${(data as any).error?.message || "Unknown error"}`,
+					)
 				}
 
 				const song = SongParser.parse(data)
@@ -419,43 +427,49 @@ export default class YTMusic {
 
 				return song
 			} catch (error) {
-				throw new Error(`Failed to get song with videoId ${videoId}: ${(error as Error).message}`)
+				throw new Error(
+					`Failed to get song with videoId ${videoId}: ${(error as Error).message}`,
+				)
 			}
-		}, 5);
+		}, 5)
 	}
-	
-  /**
-   * Get all possible information of a Up Nexts Song
-   *
-   * @param videoId Video ID
-   * @returns Up Nexts Data
-   */
-  
-  async getUpNexts(videoId: string): Promise<UpNextsDetails[]> {
-    if (!videoId.match(/^[a-zA-Z0-9-_]{11}$/)) throw new Error("Invalid videoId");
-  
-    const data = await this.constructRequest("next", {  
-      videoId, 
-      playlistId: `RDAMVM${videoId}`, 
-      isAudioOnly: true 
-    });
-  
-    const tabs = data?.contents?.singleColumnMusicWatchNextResultsRenderer?.tabbedRenderer?.watchNextTabbedResultsRenderer?.tabs[0]?.tabRenderer?.content?.musicQueueRenderer?.content?.playlistPanelRenderer?.contents;
-  
-    if (!tabs) throw new Error("Invalid response structure");
-  
-	return tabs.slice(1).map((item: any) => {
-      const { videoId, title, shortBylineText, lengthText, thumbnail } = item.playlistPanelVideoRenderer;
-      return {
-		type: "SONG",
-        videoId,
-        title: title?.runs[0]?.text || "Unknown",
-        artists: shortBylineText?.runs[0]?.text || "Unknown",
-        duration: lengthText?.runs[0]?.text || "Unknown",
-        thumbnail: thumbnail?.thumbnails.at(-1)?.url || "Unknown",
-      };
-    });
-  }
+
+	/**
+	 * Get all possible information of a Up Nexts Song
+	 *
+	 * @param videoId Video ID
+	 * @returns Up Nexts Data
+	 */
+
+	async getUpNexts(videoId: string): Promise<UpNextsDetails[]> {
+		if (!videoId.match(/^[a-zA-Z0-9-_]{11}$/)) throw new Error("Invalid videoId")
+
+		const data = await this.constructRequest("next", {
+			videoId,
+			playlistId: `RDAMVM${videoId}`,
+			isAudioOnly: true,
+		})
+
+		const tabs =
+			data?.contents?.singleColumnMusicWatchNextResultsRenderer?.tabbedRenderer
+				?.watchNextTabbedResultsRenderer?.tabs[0]?.tabRenderer?.content?.musicQueueRenderer
+				?.content?.playlistPanelRenderer?.contents
+
+		if (!tabs) throw new Error("Invalid response structure")
+
+		return tabs.slice(1).map((item: any) => {
+			const { videoId, title, shortBylineText, lengthText, thumbnail } =
+				item.playlistPanelVideoRenderer
+			return {
+				type: "SONG",
+				videoId,
+				title: title?.runs[0]?.text || "Unknown",
+				artists: shortBylineText?.runs[0]?.text || "Unknown",
+				duration: lengthText?.runs[0]?.text || "Unknown",
+				thumbnail: thumbnail?.thumbnails.at(-1)?.url || "Unknown",
+			}
+		})
+	}
 
 	/**
 	 * Get all possible information of a Video
@@ -552,61 +566,68 @@ export default class YTMusic {
 	public async getArtistAlbums(artistId: string): Promise<AlbumDetailed[]> {
 		const artistData = await this.constructRequest("browse", {
 			browseId: artistId,
-		});
-		
-		// Afficher tous les carousels pour voir leurs titres
-		const carousels = traverseList(artistData, "musicCarouselShelfRenderer");
-		// console.log("\nTous les carousels disponibles:");
-		carousels.forEach(carousel => {
-			const title = traverseString(carousel, "header", "musicCarouselShelfBasicHeaderRenderer", "title", "text");
-			// console.log("Titre du carousel:", title);
-		});
+		})
+
+		// Récupérer tous les carousels
+		const carousels = traverseList(artistData, "musicCarouselShelfRenderer")
 
 		// Trouver le carousel des albums
 		const albumsCarousel = carousels.find(carousel => {
-			const title = traverseString(carousel, "header", "musicCarouselShelfBasicHeaderRenderer", "title", "text");
+			const title = traverseString(
+				carousel,
+				"header",
+				"musicCarouselShelfBasicHeaderRenderer",
+				"title",
+				"text",
+			)
 			// console.log("Vérification du titre pour albums:", title);
-			return title && title.toLowerCase() === "albums";
-		});
+			return title && title.toLowerCase() === "albums"
+		})
 
 		if (!albumsCarousel) {
 			// console.log("Aucun carousel d'albums trouvé");
-			return [];
+			return []
 		}
 
 		// Récupérer les albums du carousel et les filtrer
 		const albums = traverseList(albumsCarousel, "musicTwoRowItemRenderer")
-			.map(item => AlbumParser.parseArtistAlbum(item, {
-				artistId,
-				name: traverseString(artistData, "header", "title", "text"),
-			}))
-			.filter(album => 
-				album.artist.artistId === artistId && // Même artiste
-				album.year && // L'année existe
-				!album.albumId.startsWith("VL") // Pas une playlist
-			);
+			.map(item =>
+				AlbumParser.parseArtistAlbum(item, {
+					artistId,
+					name: traverseString(artistData, "header", "title", "text"),
+				}),
+			)
+			.filter(
+				album =>
+					album.artist.artistId === artistId && // Même artiste
+					album.year && // L'année existe
+					!album.albumId.startsWith("VL"), // Pas une playlist
+			)
 
 		// Vérifier s'il y a un bouton "more"
-		const browseBody = traverse(albumsCarousel, "moreContentButton", "browseEndpoint");
-		
+		const browseBody = traverse(albumsCarousel, "moreContentButton", "browseEndpoint")
+
 		if (!browseBody) {
-			return albums;
+			return albums
 		}
 
 		// Si on a un bouton "more", récupérer tous les albums
-		const albumsData = await this.constructRequest("browse", browseBody);
+		const albumsData = await this.constructRequest("browse", browseBody)
 		const moreAlbums = traverseList(albumsData, "musicTwoRowItemRenderer")
-			.map(item => AlbumParser.parseArtistAlbum(item, {
-				artistId,
-				name: traverseString(albumsData, "header", "runs", "text"),
-			}))
-			.filter(album => 
-				album.artist.artistId === artistId && // Même artiste
-				album.year && // L'année existe
-				!album.albumId.startsWith("VL") // Pas une playlist
-			);
+			.map(item =>
+				AlbumParser.parseArtistAlbum(item, {
+					artistId,
+					name: traverseString(albumsData, "header", "runs", "text"),
+				}),
+			)
+			.filter(
+				album =>
+					album.artist.artistId === artistId && // Même artiste
+					album.year && // L'année existe
+					!album.albumId.startsWith("VL"), // Pas une playlist
+			)
 
-		return [...albums, ...moreAlbums];
+		return [...albums, ...moreAlbums]
 	}
 
 	/**
@@ -618,59 +639,228 @@ export default class YTMusic {
 	public async getArtistSingles(artistId: string): Promise<AlbumDetailed[]> {
 		const artistData = await this.constructRequest("browse", {
 			browseId: artistId,
-		});
-		
+		})
+
 		// Trouver les carousels des singles et EPs
-		const carousels = traverseList(artistData, "musicCarouselShelfRenderer");
+		const carousels = traverseList(artistData, "musicCarouselShelfRenderer")
 		const relevantCarousels = carousels.filter(carousel => {
-			const title = traverseString(carousel, "header", "musicCarouselShelfBasicHeaderRenderer", "title", "text");
+			const title = traverseString(
+				carousel,
+				"header",
+				"musicCarouselShelfBasicHeaderRenderer",
+				"title",
+				"text",
+			)
 			return title && title.toLowerCase().includes("singles")
-		});
+		})
 
 		if (relevantCarousels.length === 0) {
-			return [];
+			return []
 		}
 
-		let allItems: AlbumDetailed[] = [];
+		let allItems: AlbumDetailed[] = []
 
 		// Traiter chaque carousel pertinent
 		for (const carousel of relevantCarousels) {
 			// Récupérer les singles/EPs du carousel
 			const items = traverseList(carousel, "musicTwoRowItemRenderer")
-				.map(item => AlbumParser.parseArtistAlbum(item, {
-					artistId,
-					name: traverseString(artistData, "header", "title", "text"),
-				}))
-				.filter(item => 
-					item.artist.artistId === artistId && // Même artiste
-					item.year && // L'année existe
-					!item.albumId.startsWith("VL") // Pas une playlist
-				);
-
-			allItems = [...allItems, ...items];
-
-			// Vérifier s'il y a un bouton "more"
-			const browseBody = traverse(carousel, "moreContentButton", "browseEndpoint");
-			
-			if (browseBody) {
-				// Si on a un bouton "more", récupérer tous les items
-				const moreData = await this.constructRequest("browse", browseBody);
-				const moreItems = traverseList(moreData, "musicTwoRowItemRenderer")
-					.map(item => AlbumParser.parseArtistAlbum(item, {
+				.map(item =>
+					AlbumParser.parseArtistAlbum(item, {
 						artistId,
-						name: traverseString(moreData, "header", "runs", "text"),
-					}))
-					.filter(item => 
+						name: traverseString(artistData, "header", "title", "text"),
+					}),
+				)
+				.filter(
+					item =>
 						item.artist.artistId === artistId && // Même artiste
 						item.year && // L'année existe
-						!item.albumId.startsWith("VL") // Pas une playlist
-					);
+						!item.albumId.startsWith("VL"), // Pas une playlist
+				)
 
-				allItems = [...allItems, ...moreItems];
+			allItems = [...allItems, ...items]
+
+			// Vérifier s'il y a un bouton "more"
+			const browseBody = traverse(carousel, "moreContentButton", "browseEndpoint")
+
+			if (browseBody) {
+				// Si on a un bouton "more", récupérer tous les items
+				const moreData = await this.constructRequest("browse", browseBody)
+				const moreItems = traverseList(moreData, "musicTwoRowItemRenderer")
+					.map(item =>
+						AlbumParser.parseArtistAlbum(item, {
+							artistId,
+							name: traverseString(moreData, "header", "runs", "text"),
+						}),
+					)
+					.filter(
+						item =>
+							item.artist.artistId === artistId && // Même artiste
+							item.year && // L'année existe
+							!item.albumId.startsWith("VL"), // Pas une playlist
+					)
+
+				allItems = [...allItems, ...moreItems]
 			}
 		}
 
-		return allItems;
+		return allItems
+	}
+
+	/**
+	 * Get all artist releases (albums, singles, EPs) in one unified method
+	 * This method handles the common case where YouTube Music mixes releases
+	 * and provides better error handling for missing albumIds
+	 *
+	 * @param artistId Artist ID
+	 * @returns Object containing categorized releases
+	 */
+	public async getArtistReleases(artistId: string): Promise<ArtistReleases> {
+		const artistData = await this.constructRequest("browse", {
+			browseId: artistId,
+		})
+
+		const artistBasic = {
+			artistId,
+			name: traverseString(artistData, "header", "title", "text"),
+		}
+
+		// Récupérer tous les carousels
+		const carousels = traverseList(artistData, "musicCarouselShelfRenderer")
+
+		// Fonction pour traiter un carousel et ses "more" items
+		const processCarousel = async (carousel: any): Promise<AlbumDetailed[]> => {
+			// Items du carousel principal
+			const mainItems = traverseList(carousel, "musicTwoRowItemRenderer")
+				.map(item =>
+					checkTypeStrict(this.parseReleaseItem(item, artistBasic), AlbumDetailed),
+				)
+				.filter((item): item is AlbumDetailed => item !== null)
+				.filter(
+					item =>
+						item.artist.artistId === artistId && // Même artiste
+						!item.albumId?.startsWith("VL"), // Pas une playlist
+				)
+
+			// Vérifier s'il y a un bouton "more"
+			const browseBody = traverse(carousel, "moreContentButton", "browseEndpoint")
+
+			if (!browseBody) {
+				return mainItems
+			}
+
+			// Récupérer les items supplémentaires
+			const moreData = await this.constructRequest("browse", browseBody)
+			const moreItems = traverseList(moreData, "musicTwoRowItemRenderer")
+				.map(item =>
+					checkTypeStrict(this.parseReleaseItem(item, artistBasic), AlbumDetailed),
+				)
+				.filter((item): item is AlbumDetailed => item !== null)
+				.filter(
+					item =>
+						item.artist.artistId === artistId && // Même artiste
+						!item.albumId?.startsWith("VL"), // Pas une playlist
+				)
+
+			return [...mainItems, ...moreItems]
+		}
+
+		// Traiter chaque carousel
+		const albums: AlbumDetailed[] = []
+		const singles: AlbumDetailed[] = []
+		const eps: AlbumDetailed[] = []
+
+		for (const carousel of carousels) {
+			const title = traverseString(
+				carousel,
+				"header",
+				"musicCarouselShelfBasicHeaderRenderer",
+				"title",
+				"text",
+			)
+			if (!title) continue
+
+			const titleLower = title.toLowerCase()
+			const items = await processCarousel(carousel)
+
+			// Classification basée sur le titre du carousel et la heuristique des titres
+			if (titleLower === "albums") {
+				albums.push(...items)
+			} else if (titleLower.includes("singles") || titleLower.includes("ep")) {
+				// Classification plus fine basée sur les métadonnées
+				for (const item of items) {
+					const releaseType = this.classifyRelease(item)
+					if (releaseType === "SINGLE") {
+						singles.push(item)
+					} else if (releaseType === "EP") {
+						eps.push(item)
+					} else {
+						// Fallback vers singles si incertain
+						singles.push(item)
+					}
+				}
+			}
+		}
+
+		return {
+			albums,
+			singles,
+			eps,
+		}
+	}
+
+	/**
+	 * Parse a release item (album/single/EP) with better error handling
+	 */
+	private parseReleaseItem(
+		item: any,
+		artistBasic: { artistId: string; name: string | null },
+	): any {
+		const albumId = traverseList(item, "browseId").at(-1)
+
+		return {
+			type: "ALBUM",
+			albumId: albumId || `MISSING_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Fallback ID
+			playlistId: traverseString(item, "thumbnailOverlay", "playlistId") || "",
+			name: traverseString(item, "title", "text") || "Unknown Release",
+			artist: artistBasic,
+			year: this.processYear(traverseList(item, "subtitle", "text").at(-1)),
+			thumbnails: traverseList(item, "thumbnails") || [],
+		}
+	}
+
+	/**
+	 * Classify a release as ALBUM, SINGLE, or EP based on name and metadata
+	 */
+	private classifyRelease(release: AlbumDetailed): ReleaseType {
+		const name = release.name.toLowerCase()
+
+		// Détection par mots-clés dans le titre
+		if (name.includes("single") || name.includes("digital single")) {
+			return "SINGLE"
+		}
+
+		if (name.includes("ep") || name.includes("mini album")) {
+			return "EP"
+		}
+
+		// Détection par format du nom (patterns courants K-pop)
+		if (name.match(/\d+(st|nd|rd|th)\s+single/i)) {
+			return "SINGLE"
+		}
+
+		if (name.match(/\d+(st|nd|rd|th)\s+mini\s+album/i)) {
+			return "EP"
+		}
+
+		// Par défaut, considérer comme un single si incertain
+		return "SINGLE"
+	}
+
+	/**
+	 * Process year string to number (extracted from AlbumParser)
+	 */
+	private processYear(year: string): number | null {
+		return year && year.match(/^\d{4}$/) ? +year : null
 	}
 
 	/**
@@ -731,7 +921,9 @@ export default class YTMusic {
 			continuation = traverse(songsData, "continuation")
 		}
 
-		return songs.map(VideoParser.parsePlaylistVideo).filter((video): video is VideoDetailed => video !== undefined)
+		return songs
+			.map(VideoParser.parsePlaylistVideo)
+			.filter((video): video is VideoDetailed => video !== undefined)
 	}
 
 	/**

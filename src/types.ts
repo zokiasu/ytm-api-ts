@@ -116,16 +116,16 @@ export const VideoFull = z
 
 export type UpNextsDetails = z.infer<typeof UpNextsDetails>
 export const UpNextsDetails = z
-		.object({
+	.object({
 		type: z.literal("SONG"),
 		videoId: z.string(),
 		title: z.string(),
 		artists: ArtistBasic,
 		duration: z.number(),
 		thumbnails: z.array(ThumbnailFull),
-		})
-		.strict()
-		
+	})
+	.strict()
+
 export type ArtistFull = z.infer<typeof ArtistFull>
 export const ArtistFull = z
 	.object({
@@ -182,5 +182,16 @@ export const HomeSection = z
 	.object({
 		title: z.string(),
 		contents: z.array(z.union([AlbumDetailed, PlaylistDetailed, SongDetailed])),
+	})
+	.strict()
+
+export type ReleaseType = "ALBUM" | "SINGLE" | "EP"
+
+export type ArtistReleases = z.infer<typeof ArtistReleases>
+export const ArtistReleases = z
+	.object({
+		albums: z.array(AlbumDetailed),
+		singles: z.array(AlbumDetailed),
+		eps: z.array(AlbumDetailed),
 	})
 	.strict()

@@ -21,3 +21,25 @@ export default <T>(data: T, type: ZodType<T>): T => {
 
 	return data
 }
+
+// Version stricte qui retourne null en cas d'erreur
+export const checkTypeStrict = <T>(data: T, type: ZodType<T>): T | null => {
+	const result = type.safeParse(data)
+
+	if (result.error) {
+		console.warn(
+			"Invalid data type, skipping item:",
+			JSON.stringify(
+				{
+					data,
+					error: result.error.issues,
+				},
+				null,
+				2,
+			),
+		)
+		return null
+	}
+
+	return result.data
+}
