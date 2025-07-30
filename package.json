@@ -1,6 +1,6 @@
 {
 	"name": "ytm-api-ts",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"description": "YouTube Music API with TypeScript support",
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",

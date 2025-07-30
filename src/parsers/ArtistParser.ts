@@ -1,5 +1,5 @@
-import { ArtistDetailed, ArtistFull } from "../types"
-import checkType from "../utils/checkType"
+import { ArtistDetailed, ArtistFull, SongDetailed, AlbumDetailed } from "../types"
+import checkType, { checkTypeStrict } from "../utils/checkType"
 import { traverseList, traverseString } from "../utils/traverse"
 import AlbumParser from "./AlbumParser"
 import PlaylistParser from "./PlaylistParser"
@@ -18,21 +18,23 @@ export default class ArtistParser {
 				type: "ARTIST",
 				...artistBasic,
 				thumbnails: traverseList(data, "header", "thumbnails"),
-				topSongs: traverseList(data, "musicShelfRenderer", "contents").map(item =>
-					SongParser.parseArtistTopSong(item, artistBasic),
-				),
+				topSongs: traverseList(data, "musicShelfRenderer", "contents")
+					.map(item => checkTypeStrict(SongParser.parseArtistTopSong(item, artistBasic), SongDetailed))
+					.filter((song): song is SongDetailed => song !== null),
 				topAlbums:
 					traverseList(data, "musicCarouselShelfRenderer")
 						?.at(0)
 						?.contents.map((item: any) =>
-							AlbumParser.parseArtistTopAlbum(item, artistBasic),
-						) ?? [],
+							checkTypeStrict(AlbumParser.parseArtistTopAlbum(item, artistBasic), AlbumDetailed)
+						)
+						.filter((album: any): album is AlbumDetailed => album !== null) ?? [],
 				topSingles:
 					traverseList(data, "musicCarouselShelfRenderer")
 						?.at(1)
 						?.contents.map((item: any) =>
-							AlbumParser.parseArtistTopAlbum(item, artistBasic),
-						) ?? [],
+							checkTypeStrict(AlbumParser.parseArtistTopAlbum(item, artistBasic), AlbumDetailed)
+						)
+						.filter((single: any): single is AlbumDetailed => single !== null) ?? [],
 				topVideos:
 					traverseList(data, "musicCarouselShelfRenderer")
 						?.at(2)

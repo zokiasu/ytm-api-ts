@@ -4,19 +4,7 @@ import { z } from "zod"
 
 import { ZodError, ZodType } from "zod"
 import YTMusic from "../YTMusic"
-import {
-	AlbumDetailed,
-	AlbumFull,
-	ArtistDetailed,
-	ArtistFull,
-	PlaylistDetailed,
-	PlaylistFull,
-	SearchResult,
-	SongDetailed,
-	SongFull,
-	VideoDetailed,
-	VideoFull,
-} from "../types"
+import { AlbumDetailed, ArtistFull, SongDetailed, SongFull } from "../types"
 
 const errors: ZodError[] = []
 const BLACKPINK_ID = "UCkbbMCA40i18i7UdjayMPAg"
@@ -71,10 +59,10 @@ describe("Song Tests", () => {
 	const VALID_SONG_ID = "kNITt0i55NI"
 	const INVALID_SONG_ID = "invalid_id"
 	const PROBLEMATIC_IDS = [
-		"LZWAn1xloC4",  // ID problématique 1
-		"XiKfq1BTNGU",  // ID problématique 2
+		"LZWAn1xloC4", // ID problématique 1
+		"XiKfq1BTNGU", // ID problématique 2
 	]
-	
+
 	it("Should get song details with valid ID", async () => {
 		const song = await ytmusic.getSong(VALID_SONG_ID)
 		expect(song, SongFull)

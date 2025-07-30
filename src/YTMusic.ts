@@ -558,152 +558,29 @@ export default class YTMusic {
 	}
 
 	/**
+	 * @deprecated Use getArtistReleases() instead for better error handling and unified release management
 	 * Get all of Artist's Albums
 	 *
 	 * @param artistId Artist ID
 	 * @returns Artist's Albums
 	 */
 	public async getArtistAlbums(artistId: string): Promise<AlbumDetailed[]> {
-		const artistData = await this.constructRequest("browse", {
-			browseId: artistId,
-		})
-
-		// Récupérer tous les carousels
-		const carousels = traverseList(artistData, "musicCarouselShelfRenderer")
-
-		// Trouver le carousel des albums
-		const albumsCarousel = carousels.find(carousel => {
-			const title = traverseString(
-				carousel,
-				"header",
-				"musicCarouselShelfBasicHeaderRenderer",
-				"title",
-				"text",
-			)
-			// console.log("Vérification du titre pour albums:", title);
-			return title && title.toLowerCase() === "albums"
-		})
-
-		if (!albumsCarousel) {
-			// console.log("Aucun carousel d'albums trouvé");
-			return []
-		}
-
-		// Récupérer les albums du carousel et les filtrer
-		const albums = traverseList(albumsCarousel, "musicTwoRowItemRenderer")
-			.map(item =>
-				AlbumParser.parseArtistAlbum(item, {
-					artistId,
-					name: traverseString(artistData, "header", "title", "text"),
-				}),
-			)
-			.filter(
-				album =>
-					album.artist.artistId === artistId && // Même artiste
-					album.year && // L'année existe
-					!album.albumId.startsWith("VL"), // Pas une playlist
-			)
-
-		// Vérifier s'il y a un bouton "more"
-		const browseBody = traverse(albumsCarousel, "moreContentButton", "browseEndpoint")
-
-		if (!browseBody) {
-			return albums
-		}
-
-		// Si on a un bouton "more", récupérer tous les albums
-		const albumsData = await this.constructRequest("browse", browseBody)
-		const moreAlbums = traverseList(albumsData, "musicTwoRowItemRenderer")
-			.map(item =>
-				AlbumParser.parseArtistAlbum(item, {
-					artistId,
-					name: traverseString(albumsData, "header", "runs", "text"),
-				}),
-			)
-			.filter(
-				album =>
-					album.artist.artistId === artistId && // Même artiste
-					album.year && // L'année existe
-					!album.albumId.startsWith("VL"), // Pas une playlist
-			)
-
-		return [...albums, ...moreAlbums]
+		console.warn("getArtistAlbums() is deprecated. Use getArtistReleases() instead for better error handling.")
+		const releases = await this.getArtistReleases(artistId)
+		return releases.albums
 	}
 
 	/**
+	 * @deprecated Use getArtistReleases() instead for better error handling and unified release management
 	 * Get all of Artist's Singles and EPs
 	 *
 	 * @param artistId Artist ID
 	 * @returns Artist's Singles and EPs
 	 */
 	public async getArtistSingles(artistId: string): Promise<AlbumDetailed[]> {
-		const artistData = await this.constructRequest("browse", {
-			browseId: artistId,
-		})
-
-		// Trouver les carousels des singles et EPs
-		const carousels = traverseList(artistData, "musicCarouselShelfRenderer")
-		const relevantCarousels = carousels.filter(carousel => {
-			const title = traverseString(
-				carousel,
-				"header",
-				"musicCarouselShelfBasicHeaderRenderer",
-				"title",
-				"text",
-			)
-			return title && title.toLowerCase().includes("singles")
-		})
-
-		if (relevantCarousels.length === 0) {
-			return []
-		}
-
-		let allItems: AlbumDetailed[] = []
-
-		// Traiter chaque carousel pertinent
-		for (const carousel of relevantCarousels) {
-			// Récupérer les singles/EPs du carousel
-			const items = traverseList(carousel, "musicTwoRowItemRenderer")
-				.map(item =>
-					AlbumParser.parseArtistAlbum(item, {
-						artistId,
-						name: traverseString(artistData, "header", "title", "text"),
-					}),
-				)
-				.filter(
-					item =>
-						item.artist.artistId === artistId && // Même artiste
-						item.year && // L'année existe
-						!item.albumId.startsWith("VL"), // Pas une playlist
-				)
-
-			allItems = [...allItems, ...items]
-
-			// Vérifier s'il y a un bouton "more"
-			const browseBody = traverse(carousel, "moreContentButton", "browseEndpoint")
-
-			if (browseBody) {
-				// Si on a un bouton "more", récupérer tous les items
-				const moreData = await this.constructRequest("browse", browseBody)
-				const moreItems = traverseList(moreData, "musicTwoRowItemRenderer")
-					.map(item =>
-						AlbumParser.parseArtistAlbum(item, {
-							artistId,
-							name: traverseString(moreData, "header", "runs", "text"),
-						}),
-					)
-					.filter(
-						item =>
-							item.artist.artistId === artistId && // Même artiste
-							item.year && // L'année existe
-							!item.albumId.startsWith("VL"), // Pas une playlist
-					)
-
-				allItems = [...allItems, ...moreItems]
-			}
-		}
-
-		return allItems
+		console.warn("getArtistSingles() is deprecated. Use getArtistReleases() instead for better error handling.")
+		const releases = await this.getArtistReleases(artistId)
+		return [...releases.singles, ...releases.eps]
 	}
 
 	/**
